@@ -1,15 +1,60 @@
-import React from "react";
+import React, { useState } from "react";
 import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const [productName, setProductName] = useState("");
+  const [expirationDate, setExpirationDate] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [category, setCategory] = useState("");
+
+  const closeModal = () => {
+    setModalVisible(false);
+  };
+
+  const saveProduct = () => {
+    if (!productName.trim()) {
+      Alert.alert("Missing Product", "Enter a product name.");
+      return;
+    }
+
+    if (!expirationDate.trim()) {
+      Alert.alert("Missing Date", "Enter an expiration date.");
+      return;
+    }
+
+    Alert.alert(
+      "Product Ready",
+      `${productName} is ready to save.`,
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            setProductName("");
+            setExpirationDate("");
+            setQuantity("1");
+            setCategory("");
+            setModalVisible(false);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
@@ -70,7 +115,17 @@ export default function HomeScreen() {
             activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>
-              📷  Scan Product
+              📷 Scan Product
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            activeOpacity={0.8}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.secondaryButtonText}>
+              ＋ Add Product
             </Text>
           </TouchableOpacity>
 
@@ -79,16 +134,7 @@ export default function HomeScreen() {
             activeOpacity={0.8}
           >
             <Text style={styles.secondaryButtonText}>
-              ＋  Add Product
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.secondaryButtonText}>
-              📦  View Inventory
+              📦 View Inventory
             </Text>
           </TouchableOpacity>
         </View>
@@ -108,6 +154,104 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* ADD PRODUCT MODAL */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={closeModal}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <KeyboardAvoidingView
+            style={styles.modalFlex}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <ScrollView
+              contentContainerStyle={styles.modalContainer}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <TouchableOpacity
+                onPress={closeModal}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelButton}>
+                  ‹ Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <Text style={styles.modalTitle}>
+                Add Product
+              </Text>
+
+              <Text style={styles.modalSubtitle}>
+                Add an item to your expiration inventory.
+              </Text>
+
+              <Text style={styles.label}>
+                Product Name
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Example: Milk"
+                placeholderTextColor="#6F7A84"
+                value={productName}
+                onChangeText={setProductName}
+              />
+
+              <Text style={styles.label}>
+                Expiration Date
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="MM/DD/YYYY"
+                placeholderTextColor="#6F7A84"
+                value={expirationDate}
+                onChangeText={setExpirationDate}
+                keyboardType="numbers-and-punctuation"
+              />
+
+              <Text style={styles.label}>
+                Quantity
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="1"
+                placeholderTextColor="#6F7A84"
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="number-pad"
+              />
+
+              <Text style={styles.label}>
+                Category
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Cooler, Freezer, Dry Stock..."
+                placeholderTextColor="#6F7A84"
+                value={category}
+                onChangeText={setCategory}
+              />
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={saveProduct}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveButtonText}>
+                  Save Product
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -255,5 +399,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 7,
     textAlign: "center",
+  },
+
+  modalSafeArea: {
+    flex: 1,
+    backgroundColor: "#101418",
+  },
+
+  modalFlex: {
+    flex: 1,
+  },
+
+  modalContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+
+  cancelButton: {
+    color: "#66BB6A",
+    fontSize: 17,
+    fontWeight: "600",
+    marginBottom: 25,
+  },
+
+  modalTitle: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    fontWeight: "800",
+  },
+
+  modalSubtitle: {
+    color: "#9BA5AE",
+    fontSize: 15,
+    marginTop: 6,
+    marginBottom: 30,
+  },
+
+  label: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+
+  input: {
+    backgroundColor: "#1E242B",
+    color: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#303841",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+
+  saveButton: {
+    backgroundColor: "#2E7D32",
+    borderRadius: 14,
+    paddingVertical: 17,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
   },
 });
