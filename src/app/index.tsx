@@ -27,7 +27,9 @@ type Product = {
 const STORAGE_KEY = "@expireeze_products";
 
 export default function HomeScreen() {
-  const [modalVisible, setModalVisible] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [inventoryVisible, setInventoryVisible] = useState(false);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -45,11 +47,14 @@ export default function HomeScreen() {
       const savedProducts = await AsyncStorage.getItem(STORAGE_KEY);
 
       if (savedProducts) {
-        const parsedProducts: Product[] = JSON.parse(savedProducts);
+        const parsedProducts: Product[] =
+          JSON.parse(savedProducts);
+
         setProducts(parsedProducts);
       }
     } catch (error) {
       console.error("Error loading products:", error);
+
       Alert.alert(
         "Loading Error",
         "Saved products could not be loaded."
@@ -57,6 +62,25 @@ export default function HomeScreen() {
     } finally {
       setIsLoaded(true);
     }
+  };
+
+  const formatExpirationDate = (text: string) => {
+    const numbers = text
+      .replace(/\D/g, "")
+      .slice(0, 6);
+
+    if (numbers.length <= 2) {
+      return numbers;
+    }
+
+    if (numbers.length <= 4) {
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
+    }
+
+    return `${numbers.slice(0, 2)}/${numbers.slice(
+      2,
+      4
+    )}/${numbers.slice(4)}`;
   };
 
   const parseExpirationDate = (dateString: string) => {
@@ -82,7 +106,11 @@ export default function HomeScreen() {
       year += 2000;
     }
 
-    const parsedDate = new Date(year, month - 1, day);
+    const parsedDate = new Date(
+      year,
+      month - 1,
+      day
+    );
 
     if (
       parsedDate.getFullYear() !== year ||
@@ -100,7 +128,8 @@ export default function HomeScreen() {
   const getProductStatus = (
     dateString: string
   ): "fresh" | "soon" | "expired" => {
-    const expiration = parseExpirationDate(dateString);
+    const expiration =
+      parseExpirationDate(dateString);
 
     if (!expiration) {
       return "fresh";
@@ -109,7 +138,9 @@ export default function HomeScreen() {
     const now = new Date();
     const sevenDaysFromNow = new Date();
 
-    sevenDaysFromNow.setDate(now.getDate() + 7);
+    sevenDaysFromNow.setDate(
+      now.getDate() + 7
+    );
 
     if (expiration < now) {
       return "expired";
@@ -122,13 +153,33 @@ export default function HomeScreen() {
     return "fresh";
   };
 
+  const getStatusLabel = (
+    dateString: string
+  ) => {
+    const status =
+      getProductStatus(dateString);
+
+    if (status === "expired") {
+      return "🔴 Expired";
+    }
+
+    if (status === "soon") {
+      return "🟡 Expiring Soon";
+    }
+
+    return "🟢 Fresh";
+  };
+
   const counts = useMemo(() => {
     let fresh = 0;
     let soon = 0;
     let expired = 0;
 
     products.forEach((product) => {
-      const status = getProductStatus(product.expirationDate);
+      const status =
+        getProductStatus(
+          product.expirationDate
+        );
 
       if (status === "fresh") {
         fresh += 1;
@@ -158,10 +209,6 @@ export default function HomeScreen() {
     return products[0];
   }, [products]);
 
-  const closeModal = () => {
-    setModalVisible(false);
-  };
-
   const resetForm = () => {
     setProductName("");
     setExpirationDate("");
@@ -169,16 +216,23 @@ export default function HomeScreen() {
     setCategory("");
   };
 
+  const closeAddModal = () => {
+    setAddModalVisible(false);
+  };
+
   const saveProduct = async () => {
     const cleanName = productName.trim();
-    const cleanDate = expirationDate.trim();
-    const cleanCategory = category.trim();
+    const cleanDate =
+      expirationDate.trim();
+    const cleanCategory =
+      category.trim();
 
     if (!cleanName) {
       Alert.alert(
         "Missing Product",
         "Enter a product name."
       );
+
       return;
     }
 
@@ -187,20 +241,24 @@ export default function HomeScreen() {
         "Missing Date",
         "Enter an expiration date."
       );
+
       return;
     }
 
-    const validDate = parseExpirationDate(cleanDate);
+    const validDate =
+      parseExpirationDate(cleanDate);
 
     if (!validDate) {
       Alert.alert(
         "Invalid Date",
-        "Enter the expiration date as MM/DD/YYYY."
+        "Enter the expiration date as MM/DD/YY."
       );
+
       return;
     }
 
-    const parsedQuantity = Number.parseInt(quantity, 10);
+    const parsedQuantity =
+      Number.parseInt(quantity, 10);
 
     if (
       Number.isNaN(parsedQuantity) ||
@@ -210,6 +268,7 @@ export default function HomeScreen() {
         "Invalid Quantity",
         "Quantity must be at least 1."
       );
+
       return;
     }
 
@@ -218,7 +277,8 @@ export default function HomeScreen() {
       name: cleanName,
       expirationDate: cleanDate,
       quantity: parsedQuantity,
-      category: cleanCategory || "Uncategorized",
+      category:
+        cleanCategory || "Uncategorized",
       createdAt: new Date().toISOString(),
     };
 
@@ -235,14 +295,17 @@ export default function HomeScreen() {
 
       setProducts(updatedProducts);
       resetForm();
-      setModalVisible(false);
+      setAddModalVisible(false);
 
       Alert.alert(
         "Product Saved",
         `${newProduct.name} was added to your inventory.`
       );
     } catch (error) {
-      console.error("Error saving product:", error);
+      console.error(
+        "Error saving product:",
+        error
+      );
 
       Alert.alert(
         "Save Error",
@@ -251,13 +314,70 @@ export default function HomeScreen() {
     }
   };
 
+  const deleteProduct = (
+    product: Product
+  ) => {
+    Alert.alert(
+      "Delete Product",
+      `Remove ${product.name} from inventory?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const updatedProducts =
+              products.filter(
+                (item) =>
+                  item.id !== product.id
+              );
+
+            try {
+              await AsyncStorage.setItem(
+                STORAGE_KEY,
+                JSON.stringify(
+                  updatedProducts
+                )
+              );
+
+              setProducts(
+                updatedProducts
+              );
+            } catch (error) {
+              console.error(
+                "Error deleting product:",
+                error
+              );
+
+              Alert.alert(
+                "Delete Error",
+                "The product could not be deleted."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView
+      style={styles.safeArea}
+    >
+      <StatusBar
+        barStyle="light-content"
+      />
 
       <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={
+          styles.container
+        }
+        showsVerticalScrollIndicator={
+          false
+        }
       >
         <View style={styles.header}>
           <Text style={styles.logo}>
@@ -274,50 +394,92 @@ export default function HomeScreen() {
         </Text>
 
         <View style={styles.statusCard}>
-          <View style={styles.statusTextContainer}>
-            <Text style={styles.statusTitle}>
+          <View
+            style={
+              styles.statusTextContainer
+            }
+          >
+            <Text
+              style={styles.statusTitle}
+            >
               🟢 Fresh
             </Text>
 
-            <Text style={styles.statusDescription}>
+            <Text
+              style={
+                styles.statusDescription
+              }
+            >
               Products in good standing
             </Text>
           </View>
 
-          <Text style={styles.freshNumber}>
-            {isLoaded ? counts.fresh : "-"}
+          <Text
+            style={styles.freshNumber}
+          >
+            {isLoaded
+              ? counts.fresh
+              : "-"}
           </Text>
         </View>
 
         <View style={styles.statusCard}>
-          <View style={styles.statusTextContainer}>
-            <Text style={styles.statusTitle}>
+          <View
+            style={
+              styles.statusTextContainer
+            }
+          >
+            <Text
+              style={styles.statusTitle}
+            >
               🟡 Expiring Soon
             </Text>
 
-            <Text style={styles.statusDescription}>
+            <Text
+              style={
+                styles.statusDescription
+              }
+            >
               Products expiring within 7 days
             </Text>
           </View>
 
-          <Text style={styles.warningNumber}>
-            {isLoaded ? counts.soon : "-"}
+          <Text
+            style={styles.warningNumber}
+          >
+            {isLoaded
+              ? counts.soon
+              : "-"}
           </Text>
         </View>
 
         <View style={styles.statusCard}>
-          <View style={styles.statusTextContainer}>
-            <Text style={styles.statusTitle}>
+          <View
+            style={
+              styles.statusTextContainer
+            }
+          >
+            <Text
+              style={styles.statusTitle}
+            >
               🔴 Expired
             </Text>
 
-            <Text style={styles.statusDescription}>
+            <Text
+              style={
+                styles.statusDescription
+              }
+            >
               Products to remove
             </Text>
           </View>
 
-          <Text style={styles.expiredNumber}>
-            {isLoaded ? counts.expired : "-"}
+          <Text
+            style={styles.expiredNumber}
+          >
+            {isLoaded
+              ? counts.expired
+              : "-"}
           </Text>
         </View>
 
@@ -326,59 +488,111 @@ export default function HomeScreen() {
             style={styles.primaryButton}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text
+              style={
+                styles.primaryButtonText
+              }
+            >
               📷 Scan Product
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={
+              styles.secondaryButton
+            }
             activeOpacity={0.8}
-            onPress={() => setModalVisible(true)}
+            onPress={() =>
+              setAddModalVisible(true)
+            }
           >
-            <Text style={styles.secondaryButtonText}>
+            <Text
+              style={
+                styles.secondaryButtonText
+              }
+            >
               ＋ Add Product
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={
+              styles.secondaryButton
+            }
             activeOpacity={0.8}
+            onPress={() =>
+              setInventoryVisible(true)
+            }
           >
-            <Text style={styles.secondaryButtonText}>
+            <Text
+              style={
+                styles.secondaryButtonText
+              }
+            >
               📦 View Inventory
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.activitySection}>
-          <Text style={styles.sectionTitle}>
+        <View
+          style={styles.activitySection}
+        >
+          <Text
+            style={styles.sectionTitle}
+          >
             Recent Activity
           </Text>
 
-          <View style={styles.activityCard}>
+          <View
+            style={styles.activityCard}
+          >
             {newestProduct ? (
               <>
-                <Text style={styles.activityTitle}>
+                <Text
+                  style={
+                    styles.activityTitle
+                  }
+                >
                   {newestProduct.name}
                 </Text>
 
-                <Text style={styles.activityDescription}>
-                  Expires {newestProduct.expirationDate}
+                <Text
+                  style={
+                    styles.activityDescription
+                  }
+                >
+                  Expires{" "}
+                  {
+                    newestProduct.expirationDate
+                  }
                 </Text>
 
-                <Text style={styles.activityDetails}>
-                  Qty: {newestProduct.quantity} ·{" "}
+                <Text
+                  style={
+                    styles.activityDetails
+                  }
+                >
+                  Qty:{" "}
+                  {newestProduct.quantity}
+                  {" · "}
                   {newestProduct.category}
                 </Text>
               </>
             ) : (
               <>
-                <Text style={styles.activityTitle}>
+                <Text
+                  style={
+                    styles.activityTitle
+                  }
+                >
                   No recent activity yet
                 </Text>
 
-                <Text style={styles.activityDescription}>
+                <Text
+                  style={
+                    styles.activityDescription
+                  }
+                >
                   Products you add will appear here.
                 </Text>
               </>
@@ -387,13 +601,17 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* ADD PRODUCT MODAL */}
+
       <Modal
-        visible={modalVisible}
+        visible={addModalVisible}
         animationType="slide"
         presentationStyle="fullScreen"
-        onRequestClose={closeModal}
+        onRequestClose={closeAddModal}
       >
-        <SafeAreaView style={styles.modalSafeArea}>
+        <SafeAreaView
+          style={styles.modalSafeArea}
+        >
           <KeyboardAvoidingView
             style={styles.modalFlex}
             behavior={
@@ -407,22 +625,34 @@ export default function HomeScreen() {
                 styles.modalContainer
               }
               keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={
+                false
+              }
             >
               <TouchableOpacity
-                onPress={closeModal}
+                onPress={closeAddModal}
                 activeOpacity={0.7}
               >
-                <Text style={styles.cancelButton}>
+                <Text
+                  style={
+                    styles.cancelButton
+                  }
+                >
                   ‹ Cancel
                 </Text>
               </TouchableOpacity>
 
-              <Text style={styles.modalTitle}>
+              <Text
+                style={styles.modalTitle}
+              >
                 Add Product
               </Text>
 
-              <Text style={styles.modalSubtitle}>
+              <Text
+                style={
+                  styles.modalSubtitle
+                }
+              >
                 Add an item to your expiration inventory.
               </Text>
 
@@ -435,7 +665,9 @@ export default function HomeScreen() {
                 placeholder="Example: Milk"
                 placeholderTextColor="#6F7A84"
                 value={productName}
-                onChangeText={setProductName}
+                onChangeText={
+                  setProductName
+                }
               />
 
               <Text style={styles.label}>
@@ -444,11 +676,17 @@ export default function HomeScreen() {
 
               <TextInput
                 style={styles.input}
-                placeholder="MM/DD/YYYY"
+                placeholder="MM/DD/YY"
                 placeholderTextColor="#6F7A84"
                 value={expirationDate}
-                onChangeText={setExpirationDate}
-                keyboardType="numbers-and-punctuation"
+                onChangeText={(text) =>
+                  setExpirationDate(
+                    formatExpirationDate(
+                      text
+                    )
+                  )
+                }
+                keyboardType="number-pad"
               />
 
               <Text style={styles.label}>
@@ -481,12 +719,197 @@ export default function HomeScreen() {
                 onPress={saveProduct}
                 activeOpacity={0.8}
               >
-                <Text style={styles.saveButtonText}>
+                <Text
+                  style={
+                    styles.saveButtonText
+                  }
+                >
                   Save Product
                 </Text>
               </TouchableOpacity>
             </ScrollView>
           </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* INVENTORY MODAL */}
+
+      <Modal
+        visible={inventoryVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() =>
+          setInventoryVisible(false)
+        }
+      >
+        <SafeAreaView
+          style={styles.modalSafeArea}
+        >
+          <View
+            style={
+              styles.inventoryHeader
+            }
+          >
+            <TouchableOpacity
+              onPress={() =>
+                setInventoryVisible(false)
+              }
+              activeOpacity={0.7}
+            >
+              <Text
+                style={
+                  styles.cancelButton
+                }
+              >
+                ‹ Dashboard
+              </Text>
+            </TouchableOpacity>
+
+            <Text
+              style={styles.modalTitle}
+            >
+              Inventory
+            </Text>
+
+            <Text
+              style={
+                styles.modalSubtitle
+              }
+            >
+              {products.length}{" "}
+              {products.length === 1
+                ? "product"
+                : "products"}{" "}
+              tracked
+            </Text>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={
+              styles.inventoryContainer
+            }
+            showsVerticalScrollIndicator={
+              false
+            }
+          >
+            {products.length === 0 ? (
+              <View
+                style={
+                  styles.emptyInventory
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyInventoryTitle
+                  }
+                >
+                  📦 No products yet
+                </Text>
+
+                <Text
+                  style={
+                    styles.emptyInventoryText
+                  }
+                >
+                  Add your first product from the dashboard.
+                </Text>
+              </View>
+            ) : (
+              products.map((product) => (
+                <View
+                  key={product.id}
+                  style={
+                    styles.inventoryCard
+                  }
+                >
+                  <View
+                    style={
+                      styles.inventoryTopRow
+                    }
+                  >
+                    <View
+                      style={
+                        styles.inventoryNameArea
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.inventoryName
+                        }
+                      >
+                        {product.name}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.inventoryStatus
+                        }
+                      >
+                        {getStatusLabel(
+                          product.expirationDate
+                        )}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={
+                        styles.deleteButton
+                      }
+                      onPress={() =>
+                        deleteProduct(
+                          product
+                        )
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={
+                          styles.deleteButtonText
+                        }
+                      >
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View
+                    style={
+                      styles.inventoryDivider
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.inventoryDetail
+                    }
+                  >
+                    Expires:{" "}
+                    {
+                      product.expirationDate
+                    }
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.inventoryDetail
+                    }
+                  >
+                    Quantity:{" "}
+                    {product.quantity}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.inventoryDetail
+                    }
+                  >
+                    Category:{" "}
+                    {product.category}
+                  </Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -711,5 +1134,94 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "700",
+  },
+
+  inventoryHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+
+  inventoryContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+
+  inventoryCard: {
+    backgroundColor: "#1E242B",
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#293039",
+  },
+
+  inventoryTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+
+  inventoryNameArea: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  inventoryName: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "700",
+  },
+
+  inventoryStatus: {
+    color: "#C4CBD1",
+    fontSize: 14,
+    marginTop: 7,
+  },
+
+  inventoryDivider: {
+    height: 1,
+    backgroundColor: "#303841",
+    marginVertical: 14,
+  },
+
+  inventoryDetail: {
+    color: "#B6BEC6",
+    fontSize: 14,
+    marginBottom: 7,
+  },
+
+  deleteButton: {
+    backgroundColor: "#3A2023",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  deleteButtonText: {
+    color: "#FF8A80",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  emptyInventory: {
+    backgroundColor: "#1E242B",
+    borderRadius: 16,
+    padding: 30,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#293039",
+  },
+
+  emptyInventoryTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  emptyInventoryText: {
+    color: "#9BA5AE",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
   },
 });
