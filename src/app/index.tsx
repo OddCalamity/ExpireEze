@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 
 type Product = {
   id: string;
@@ -29,6 +31,8 @@ const STORAGE_KEY = "@expireeze_products";
 export default function HomeScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [inventoryVisible, setInventoryVisible] = useState(false);
+  const [scanModalVisible, setScanModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -363,6 +367,65 @@ export default function HomeScreen() {
     );
   };
 
+
+  const takeProductPhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Camera Permission Needed",
+        "ExpireEze needs camera permission to take a product photo."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      setScanModalVisible(true);
+    }
+  };
+
+  const chooseProductPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo Permission Needed",
+        "ExpireEze needs photo access to choose a product image."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      setScanModalVisible(true);
+    }
+  };
+
+  const openScanOptions = () => {
+    Alert.alert(
+      "Scan Product",
+      "Choose how you want to add a product image.",
+      [
+        { text: "Take Photo", onPress: takeProductPhoto },
+        { text: "Choose from Gallery", onPress: chooseProductPhoto },
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView
       style={styles.safeArea}
@@ -487,6 +550,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.primaryButton}
             activeOpacity={0.8}
+            onPress={openScanOptions}
           >
             <Text
               style={
@@ -729,6 +793,64 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </ScrollView>
           </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+
+      {/* SCAN PREVIEW MODAL */}
+
+      <Modal
+        visible={scanModalVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setScanModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <ScrollView
+            contentContainerStyle={styles.scanContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              onPress={() => setScanModalVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelButton}>‹ Dashboard</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.modalTitle}>Product Image</Text>
+
+            <Text style={styles.modalSubtitle}>
+              Image capture is working. Date reading comes in the next scanner milestone.
+            </Text>
+
+            {selectedImage ? (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.scanPreview}
+                resizeMode="contain"
+              />
+            ) : null}
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={takeProductPhoto}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryButtonText}>
+                📷 Take Another Photo
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={chooseProductPhoto}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.secondaryButtonText}>
+                🖼️ Choose Another Image
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
 
@@ -1224,4 +1346,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+
+  scanContainer: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+
+  scanPreview: {
+    width: "100%",
+    height: 420,
+    backgroundColor: "#1E242B",
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+
 });
