@@ -16,7 +16,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-
+import { CameraView, useCameraPermissions } from "expo-camera";
+import {
+  extractTextFromImage,
+  isSupported,
+} from "expo-text-extractor";
 type Product = {
   id: string;
   name: string;
@@ -33,9 +37,16 @@ export default function HomeScreen() {
   const [inventoryVisible, setInventoryVisible] = useState(false);
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
+  const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [barcodeScanned, setBarcodeScanned] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const [ocrText, setOcrText] = useState("");
+  const [detectedDates, setDetectedDates] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
 
   const [productName, setProductName] = useState("");
   const [expirationDate, setExpirationDate] = useState("");
@@ -367,7 +378,151 @@ export default function HomeScreen() {
     );
   };
 
+  const scanImageForDate = async (imageUri: string) => {
+    if (!isSupported) {
+      Alert.alert(
+        "OCR Not Supported",
+        "Text recognition is not supported on this device."
+      );
+      return;
+    }
 
+    try {
+      setIsScanning(true);
+      setOcrText("");
+      setDetectedDates([]);
+
+      const textLines = await extractTextFromImage(imageUri);
+      const fullText = textLines.join("\n");
+
+      console.log("OCR RESULT:", fullText);
+
+      setOcrText(fullText);
+
+      // Normalize OCR text for date detection.
+      const normalizedText = fullText
+        .replace(/\r/g, "")
+        .replace(/[|]/g, "I")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Common date formats:
+      // 08/27/2027
+      // 27-08-2027
+      // 08 27 27
+      // AUG 2027
+      // AUG 27 2027
+      const numericDateRegex =
+        /\b(?:0?[1-9]|[12]\d|3[01])[\s/.-](?:0?[1-9]|1[0-2])[\s/.-](?:\d{2}|\d{4})\b|\b(?:0?[1-9]|1[0-2])[\s/.-](?:0?[1-9]|[12]\d|3[01])[\s/.-](?:\d{2}|\d{4})\b/g;
+
+      const monthDateRegex =
+        /\b(?:JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|SEPT(?:EMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)(?:[\s/.-]+\d{1,2})?[\s/.-]+\d{2,4}\b/gi;
+
+      const shortMonthYearRegex =
+        /\b(?:0?[1-9]|1[0-2])[\s/.-](?:\d{2}|\d{4})\b/g;
+
+      const datePatterns = [
+        numericDateRegex,
+        monthDateRegex,
+        shortMonthYearRegex,
+      ];
+
+      const expiryKeywords =
+        /\b(BB|BBE|BEST BEFORE|BEST BY|EXP|EXPIRY|EXPIRES|EXPIRATION|USE BY)\b/i;
+
+      const candidates: string[] = [];
+
+      // Prioritize dates on lines containing expiry keywords.
+      for (let i = 0; i < textLines.length; i++) {
+        const currentLine = textLines[i].trim();
+        const nextLine = textLines[i + 1]?.trim() ?? "";
+
+        if (expiryKeywords.test(currentLine)) {
+          const priorityText = `${currentLine} ${nextLine}`;
+
+          for (const pattern of datePatterns) {
+            const matches = priorityText.match(pattern) ?? [];
+            candidates.push(...matches);
+          }
+        }
+      }
+
+      // Fall back to dates anywhere in OCR text.
+      for (const pattern of datePatterns) {
+        const matches = normalizedText.match(pattern) ?? [];
+        candidates.push(...matches);
+      }
+
+      const dates = [...new Set(candidates)];
+
+      setDetectedDates(dates);
+
+      if (dates.length > 0) {
+        const detectedDate = dates[0];
+
+        setExpirationDate(detectedDate);
+        setScanModalVisible(false);
+        setAddModalVisible(true);
+
+        Alert.alert(
+          "Expiration Date Detected",
+          `${detectedDate}\n\nReview the product details, then tap Save Product.`
+        );
+      } else {
+        Alert.alert(
+          "No Date Found",
+          "Text was recognized, but no BB, Best Before, EXP, or Use By date was detected."
+        );
+      }
+    } catch (error) {
+      console.error("OCR error:", error);
+
+      Alert.alert(
+        "Scan Error",
+        "The image could not be read. Try a close, straight-on photo of the date."
+      );
+    } finally {
+      setIsScanning(false);
+    }
+  };  
+
+const handleBarcodeScanned = ({
+    type,
+    data,
+  }: {
+    type: string;
+    data: string;
+  }) => {
+    if (barcodeScanned) {
+      return;
+    }
+
+    setBarcodeScanned(true);
+    setScannedBarcode(data);
+    setBarcodeScannerVisible(false);
+
+    console.log("BARCODE TYPE:", type);
+    console.log("BARCODE DATA:", data);
+
+    Alert.alert(
+      "Barcode Scanned",
+      `Barcode: ${data}\n\nNow scan the Best Before or Expiration Date.`,
+      [
+        {
+          text: "Scan Date",
+          onPress: () => {
+            takeProductPhoto();
+          },
+        },
+        {
+          text: "Enter Manually",
+          onPress: () => {
+            setAddModalVisible(true);
+          },
+        },
+      ]
+    );
+  };
   const takeProductPhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
@@ -385,10 +540,14 @@ export default function HomeScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-      setScanModalVisible(true);
-    }
+   if (!result.canceled) {
+  const imageUri = result.assets[0].uri;
+
+  setSelectedImage(imageUri);
+  setScanModalVisible(true);
+
+  await scanImageForDate(imageUri);
+}
   };
 
   const chooseProductPhoto = async () => {
@@ -409,22 +568,31 @@ export default function HomeScreen() {
     });
 
     if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+
+      setSelectedImage(imageUri);
       setScanModalVisible(true);
+
+      await scanImageForDate(imageUri);
     }
   };
 
-  const openScanOptions = () => {
-    Alert.alert(
-      "Scan Product",
-      "Choose how you want to add a product image.",
-      [
-        { text: "Take Photo", onPress: takeProductPhoto },
-        { text: "Choose from Gallery", onPress: chooseProductPhoto },
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
-  };
+  const openScanOptions = async () => {
+    if (!cameraPermission?.granted) {
+      const permissionResult = await requestCameraPermission();
+
+    if (!permissionResult.granted) {
+      Alert.alert(
+        "Camera Permission Needed",
+        "ExpireEze needs camera permission to scan product barcodes."
+      );
+      return;
+    }
+  }
+
+  setBarcodeScanned(false);
+  setBarcodeScannerVisible(true);
+};
 
   return (
     <SafeAreaView
@@ -853,7 +1021,50 @@ export default function HomeScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      {/* BARCODE SCANNER MODAL */}
+      <Modal
+        visible={barcodeScannerVisible}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => {
+          setBarcodeScannerVisible(false);
+          setBarcodeScanned(false);
+        }}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          <View style={{ flex: 1 }}>
+            <CameraView
+              style={{ flex: 1 }}
+              autofocus="on"
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: [
+                  "ean13",
+                  "ean8",
+                  "upc_a",
+                  "upc_e",
+                  "qr",
+                ],
+              }}
+              onBarcodeScanned={
+                barcodeScanned ? undefined : handleBarcodeScanned
+              }
+            />
 
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => {
+                setBarcodeScannerVisible(false);
+                setBarcodeScanned(false);
+              }}
+            >
+              <Text style={styles.primaryButtonText}>
+                Cancel Scan
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
       {/* INVENTORY MODAL */}
 
       <Modal
@@ -1037,7 +1248,6 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
