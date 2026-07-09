@@ -460,7 +460,30 @@ export default function HomeScreen() {
       if (dates.length > 0) {
         const detectedDate = dates[0];
 
-        setExpirationDate(detectedDate);
+const numericParts = detectedDate
+  .match(/\d+/g)
+  ?.map(Number);
+
+let normalizedDate = detectedDate;
+
+if (numericParts?.length === 3) {
+  let [first, second, year] = numericParts;
+
+  if (first > 12) {
+    [first, second] = [second, first];
+  }
+
+  const shortYear = year >= 2000
+    ? year - 2000
+    : year;
+
+  normalizedDate =
+    `${String(first).padStart(2, "0")}/` +
+    `${String(second).padStart(2, "0")}/` +
+    `${String(shortYear).padStart(2, "0")}`;
+}
+
+setExpirationDate(normalizedDate);
         setScanModalVisible(false);
         setAddModalVisible(true);
 
