@@ -28,6 +28,8 @@ type Product = {
   quantity: number;
   category: string;
   createdAt: string;
+  barcode: string | null;
+  barcodeType: string | null;
 };
 
 const STORAGE_KEY = "@expireeze_products";
@@ -38,7 +40,10 @@ export default function HomeScreen() {
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
-  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const [scannedBarcode, setScannedBarcode] =
+    useState<string | null>(null);
+  const [scannedBarcodeType, setScannedBarcodeType] =
+    useState<string | null>(null);
   const [barcodeScanned, setBarcodeScanned] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [products, setProducts] = useState<Product[]>([]);
@@ -293,8 +298,10 @@ export default function HomeScreen() {
       expirationDate: cleanDate,
       quantity: parsedQuantity,
       category:
-        cleanCategory || "Uncategorized",
+      cleanCategory || "Uncategorized",
       createdAt: new Date().toISOString(),
+      barcode: scannedBarcode,
+      barcodeType: scannedBarcodeType,
     };
 
     const updatedProducts = [
@@ -457,46 +464,87 @@ export default function HomeScreen() {
 
       setDetectedDates(dates);
 
-      if (dates.length > 0) {
+       if (dates.length > 0) {
         const detectedDate = dates[0];
 
-const numericParts = detectedDate
-  .match(/\d+/g)
-  ?.map(Number);
+        const numericParts = detectedDate
+          .match(/\d+/g)
+          ?.map(Number);
 
-let normalizedDate = detectedDate;
+        let normalizedDate = detectedDate;
 
-if (numericParts?.length === 3) {
-  let [first, second, year] = numericParts;
+        const monthNames: Record<string, number> = {
+          JAN: 1,
+          FEB: 2,
+          MAR: 3,
+          APR: 4,
+          MAY: 5,
+          JUN: 6,
+          JUL: 7,
+          AUG: 8,
+          SEP: 9,
+          SEPT: 9,
+          OCT: 10,
+          NOV: 11,
+          DEC: 12,
+        };
 
-  if (first > 12) {
-    [first, second] = [second, first];
-  }
+        const monthMatch = detectedDate
+          .toUpperCase()
+          .match(
+            /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC)[A-Z]*\b/
+          );
 
-  const shortYear = year >= 2000
-    ? year - 2000
-    : year;
+        if (
+          monthMatch &&
+          numericParts &&
+          numericParts.length >= 2
+        ) {
+          const month = monthNames[monthMatch[1]];
+          const day = numericParts[0];
+          const year = numericParts[1];
 
-  normalizedDate =
-    `${String(first).padStart(2, "0")}/` +
-    `${String(second).padStart(2, "0")}/` +
-    `${String(shortYear).padStart(2, "0")}`;
-}
+          const shortYear =
+            year >= 2000 ? year - 2000 : year;
 
-setExpirationDate(normalizedDate);
+          normalizedDate =
+            `${String(month).padStart(2, "0")}/` +
+            `${String(day).padStart(2, "0")}/` +
+            `${String(shortYear).padStart(2, "0")}`;
+        } else if (numericParts?.length === 3) {
+          let [first, second, year] = numericParts;
+
+          if (first > 12) {
+            [first, second] = [second, first];
+          }
+
+          const shortYear =
+            year >= 2000 ? year - 2000 : year;
+
+          normalizedDate =
+            `${String(first).padStart(2, "0")}/` +
+            `${String(second).padStart(2, "0")}/` +
+            `${String(shortYear).padStart(2, "0")}`;
+        }
+
+        setExpirationDate(normalizedDate);
         setScanModalVisible(false);
         setAddModalVisible(true);
 
         Alert.alert(
           "Expiration Date Detected",
-          `${detectedDate}\n\nReview the product details, then tap Save Product.`
+          `${normalizedDate}\n\nReview the product details, then tap Save Product.`
         );
       } else {
+        setScanModalVisible(false);
+        setAddModalVisible(true);
+
         Alert.alert(
-          "No Date Found",
-          "Text was recognized, but no BB, Best Before, EXP, or Use By date was detected."
+          "Date Not Detected",
+          "The expiration date could not be detected automatically. Enter the date manually in the Expiration Date field."
         );
       }
+      
     } catch (error) {
       console.error("OCR error:", error);
 
@@ -508,7 +556,6 @@ setExpirationDate(normalizedDate);
       setIsScanning(false);
     }
   };  
-
 const handleBarcodeScanned = ({
     type,
     data,
@@ -516,20 +563,35 @@ const handleBarcodeScanned = ({
     type: string;
     data: string;
   }) => {
+    const normalizedData = data.trim();
+
+    const isExpoDevelopmentQr =
+      type === "qr" &&
+      (normalizedData.startsWith("exp+") ||
+        normalizedData.includes("expo-development-client"));
+
+    if (isExpoDevelopmentQr) {
+      console.log("IGNORED EXPO DEVELOPMENT QR");
+      return;
+    }
+
     if (barcodeScanned) {
       return;
     }
 
     setBarcodeScanned(true);
-    setScannedBarcode(data);
+    setScannedBarcode(normalizedData);
+    setScannedBarcodeType(type);
     setBarcodeScannerVisible(false);
 
     console.log("BARCODE TYPE:", type);
-    console.log("BARCODE DATA:", data);
+    console.log("BARCODE DATA:", normalizedData);
 
     Alert.alert(
-      "Barcode Scanned",
-      `Barcode: ${data}\n\nNow scan the Best Before or Expiration Date.`,
+      type === "qr"
+        ? "QR Code Scanned"
+        : "Barcode Scanned",
+      `Code: ${normalizedData}\n\nNow scan the Best Before or Expiration Date.`,
       [
         {
           text: "Scan Date",
@@ -546,8 +608,10 @@ const handleBarcodeScanned = ({
       ]
     );
   };
+
   const takeProductPhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    const permission = 
+      await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
       Alert.alert(
@@ -1270,7 +1334,7 @@ const handleBarcodeScanned = ({
       </Modal>
     </SafeAreaView>
   );
-}
+ }
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
