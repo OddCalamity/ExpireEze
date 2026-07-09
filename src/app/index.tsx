@@ -440,15 +440,22 @@ export default function HomeScreen() {
       const candidates: string[] = [];
 
       // Prioritize dates on lines containing expiry keywords.
-      for (let i = 0; i < textLines.length; i++) {
-        const currentLine = textLines[i].trim();
-        const nextLine = textLines[i + 1]?.trim() ?? "";
+       for (let i = 0; i < textLines.length; i++) {
+        const previousLine =
+          textLines[i - 1]?.trim() ?? "";
+        const currentLine =
+          textLines[i].trim();
+        const nextLine =
+          textLines[i + 1]?.trim() ?? "";
 
-        if (expiryKeywords.test(currentLine)) {
-          const priorityText = `${currentLine} ${nextLine}`;
+        const contextText =
+          `${previousLine} ${currentLine} ${nextLine}`;
 
+        if (expiryKeywords.test(contextText)) {
           for (const pattern of datePatterns) {
-            const matches = priorityText.match(pattern) ?? [];
+            const matches =
+              contextText.match(pattern) ?? [];
+
             candidates.push(...matches);
           }
         }
@@ -520,7 +527,20 @@ export default function HomeScreen() {
 
           const shortYear =
             year >= 2000 ? year - 2000 : year;
+        const validatedDate =
+          parseExpirationDate(normalizedDate);
 
+        if (!validatedDate) {
+          setScanModalVisible(false);
+          setAddModalVisible(true);
+
+          Alert.alert(
+            "Date Needs Review",
+            `The scanner found "${detectedDate}", but it could not confirm a valid expiration date. Enter the date manually as MM/DD/YY.`
+          );
+
+          return;
+        }
           normalizedDate =
             `${String(first).padStart(2, "0")}/` +
             `${String(second).padStart(2, "0")}/` +
@@ -541,7 +561,7 @@ export default function HomeScreen() {
 
         Alert.alert(
           "Date Not Detected",
-          "The expiration date could not be detected automatically. Enter the date manually in the Expiration Date field."
+          "No reliable expiration date was found. Enter the package date manually as MM/DD/YY, then review the product details before saving."
         );
       }
       
