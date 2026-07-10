@@ -596,7 +596,50 @@ export default function HomeScreen() {
       setIsScanning(false);
     }  
   };
+    const linkCodeToLegacyProduct = async (
+    product: Product,
+    barcode: string,
+    barcodeType: string
+  ) => {
+    const updatedProducts = products.map(
+      (item) =>
+        item.name.trim().toLowerCase() ===
+          product.name.trim().toLowerCase() &&
+        !item.barcode
+          ? {
+              ...item,
+              barcode,
+              barcodeType,
+            }
+          : item
+    );
 
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(updatedProducts)
+      );
+
+      setProducts(updatedProducts);
+      setProductName(product.name);
+      setCategory(product.category);
+
+      Alert.alert(
+        "Product Linked",
+        `${product.name} is now linked to this code. Existing expiration batches with the same product name were updated.`
+      );
+    } catch (error) {
+      console.error(
+        "Error linking legacy product:",
+        error
+      );
+
+      Alert.alert(
+        "Link Error",
+        "The product code could not be linked."
+      );
+    }
+  };
   const handleBarcodeScanned = ({
     type,
     data,
@@ -628,7 +671,9 @@ export default function HomeScreen() {
       (product) =>
         product.barcode === normalizedData
     );
-
+    const legacyProducts = products.filter(
+  (product) => !product.barcode
+);
     setBarcodeScanned(true);
     setScannedBarcode(normalizedData);
     setScannedBarcodeType(type);
