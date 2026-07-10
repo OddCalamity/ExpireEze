@@ -594,9 +594,10 @@ export default function HomeScreen() {
       );
     } finally {
       setIsScanning(false);
-    }
-  };  
-const handleBarcodeScanned = ({
+    }  
+  };
+
+  const handleBarcodeScanned = ({
     type,
     data,
   }: {
@@ -608,10 +609,14 @@ const handleBarcodeScanned = ({
     const isExpoDevelopmentQr =
       type === "qr" &&
       (normalizedData.startsWith("exp+") ||
-        normalizedData.includes("expo-development-client"));
+        normalizedData.includes(
+          "expo-development-client"
+        ));
 
     if (isExpoDevelopmentQr) {
-      console.log("IGNORED EXPO DEVELOPMENT QR");
+      console.log(
+        "IGNORED EXPO DEVELOPMENT QR"
+      );
       return;
     }
 
@@ -619,19 +624,39 @@ const handleBarcodeScanned = ({
       return;
     }
 
+    const knownProduct = products.find(
+      (product) =>
+        product.barcode === normalizedData
+    );
+
     setBarcodeScanned(true);
     setScannedBarcode(normalizedData);
     setScannedBarcodeType(type);
     setBarcodeScannerVisible(false);
 
+    if (knownProduct) {
+      setProductName(knownProduct.name);
+      setCategory(knownProduct.category);
+    } else {
+      setProductName("");
+      setCategory("");
+    }
+
     console.log("BARCODE TYPE:", type);
-    console.log("BARCODE DATA:", normalizedData);
+    console.log(
+      "BARCODE DATA:",
+      normalizedData
+    );
 
     Alert.alert(
-      type === "qr"
-        ? "QR Code Scanned"
-        : "Barcode Scanned",
-      `Code: ${normalizedData}\n\nNow scan the Best Before or Expiration Date.`,
+      knownProduct
+        ? "Known Product Found"
+        : type === "qr"
+          ? "New QR Code Scanned"
+          : "New Barcode Scanned",
+      knownProduct
+        ? `${knownProduct.name}\n\nProduct details were filled in. Now scan the Best Before or Expiration Date.`
+        : `Code: ${normalizedData}\n\nThis code is not yet in your inventory. Enter the product details and expiration date.`,
       [
         {
           text: "Scan Date",
@@ -648,7 +673,6 @@ const handleBarcodeScanned = ({
       ]
     );
   };
-
   const takeProductPhoto = async () => {
     const permission = 
       await ImagePicker.requestCameraPermissionsAsync();
@@ -1387,7 +1411,8 @@ const handleBarcodeScanned = ({
       </Modal>
     </SafeAreaView>
   );
- }
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
