@@ -190,6 +190,7 @@ export default function HomeScreen() {
     return "🟢 Fresh";
   };
 
+ 
   const counts = useMemo(() => {
     let fresh = 0;
     let soon = 0;
@@ -197,20 +198,18 @@ export default function HomeScreen() {
 
     products.forEach((product) => {
       const status =
-        getProductStatus(
-          product.expirationDate
-        );
+        getProductStatus(product.expirationDate);
 
       if (status === "fresh") {
-        fresh += 1;
+        fresh += product.quantity;
       }
 
       if (status === "soon") {
-        soon += 1;
+        soon += product.quantity;
       }
 
       if (status === "expired") {
-        expired += 1;
+        expired += product.quantity;
       }
     });
 
@@ -303,12 +302,33 @@ export default function HomeScreen() {
       barcode: scannedBarcode,
       barcodeType: scannedBarcodeType,
     };
+    const matchingBatchIndex = products.findIndex(
+      (product) =>
+        scannedBarcode !== null &&
+        product.barcode === scannedBarcode &&
+        product.expirationDate === cleanDate
+    );
 
-    const updatedProducts = [
-      newProduct,
-      ...products,
-    ];
+    let updatedProducts: Product[];
 
+    if (matchingBatchIndex >= 0) {
+      updatedProducts = products.map(
+        (product, index) =>
+          index === matchingBatchIndex
+            ? {
+                ...product,
+                quantity:
+                  product.quantity + parsedQuantity,
+              }
+            : product
+      );
+    } else {
+      updatedProducts = [
+        newProduct,
+        ...products,
+      ];
+    }
+    
     try {
       await AsyncStorage.setItem(
         STORAGE_KEY,
@@ -1346,6 +1366,19 @@ const handleBarcodeScanned = ({
                     Category:{" "}
                     {product.category}
                   </Text>
+{product.barcode && (
+                    <Text
+                      style={
+                        styles.inventoryDetail
+                      }
+                    >
+                      {product.barcodeType === "qr"
+                        ? "QR Code"
+                        : "Barcode"}
+                      :{" "}
+                      {product.barcode}
+                    </Text>
+                  )}
                 </View>
               ))
             )}
