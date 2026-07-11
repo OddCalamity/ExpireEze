@@ -978,9 +978,10 @@ const editProduct = (product: Product) => {
               styles.secondaryButton
             }
             activeOpacity={0.8}
-            onPress={() =>
-              setInventoryVisible(true)
-            }
+            onPress={() => {
+  		setInventoryFilter("all");
+  	        setInventoryVisible(true);            
+	  }}
           >
             <Text
               style={
