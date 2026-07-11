@@ -42,7 +42,8 @@ export default function HomeScreen() {
     useState<"all" | "fresh" | "soon" | "expired">("all");
  const [inventorySearch, setInventorySearch] =
     useState("");
-    
+  const [inventorySort, setInventorySort] =
+  useState<"expiry" | "newest" | "name">("expiry"); 
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
@@ -228,11 +229,12 @@ export default function HomeScreen() {
       expired,
     };
   }, [products]);
-  const filteredProducts = useMemo(() => {
-    const searchTerm =
-      inventorySearch.trim().toLowerCase();
+const filteredProducts = useMemo(() => {
+  const searchTerm =
+    inventorySearch.trim().toLowerCase();
 
-    return products.filter((product) => {
+  const matchingProducts = products.filter(
+    (product) => {
       const matchesStatus =
         inventoryFilter === "all" ||
         getProductStatus(
@@ -252,12 +254,38 @@ export default function HomeScreen() {
           .includes(searchTerm);
 
       return matchesStatus && matchesSearch;
-    });
-  }, [
-    products,
-    inventoryFilter,
-    inventorySearch,
-  ]);  
+    }
+  );
+
+  return [...matchingProducts].sort((a, b) => {
+    if (inventorySort === "name") {
+      return a.name.localeCompare(b.name);
+    }
+
+    if (inventorySort === "newest") {
+      return (
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+      );
+    }
+
+    const aDate =
+      parseExpirationDate(a.expirationDate);
+    const bDate =
+      parseExpirationDate(b.expirationDate);
+
+    if (!aDate && !bDate) return 0;
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+
+    return aDate.getTime() - bDate.getTime();
+  });
+}, [
+  products,
+  inventoryFilter,
+  inventorySearch,
+  inventorySort,
+]);
 
     
   const newestProduct = useMemo(() => {
@@ -1370,20 +1398,59 @@ const editProduct = (product: Product) => {
               shown
             </Text>
           </View>
- <TextInput
-            style={styles.input}
-            placeholder="Search name, category, or code..."
-            placeholderTextColor="#6F7A84"
-            value={inventorySearch}
-	    onPress={() => {
- 		 setInventoryFilter("all");
-		 setInventorySearch("");
-  		 setInventoryVisible(true);
-	    }}
-            onChangeText={setInventorySearch}
-            autoCapitalize="none"
-            autoCorrect={false}
+
+	   <TextInput
+             style={styles.input}
+             placeholder="Search name, category, or code..."
+             placeholderTextColor="#6F7A84"
+             value={inventorySearch}
+             onChangeText={setInventorySearch}
+             autoCapitalize="none"
+             autoCorrect={false}
           />
+
+          <View
+            style={{
+              flexDirection: "row",
+              paddingHorizontal: 20,
+              paddingBottom: 12,
+              gap: 8,
+            }}
+          >
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() =>
+                setInventorySort("expiry")
+              }
+            >
+              <Text style={styles.secondaryButtonText}>
+                Expiry
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() =>
+                setInventorySort("newest")
+              }
+            >
+              <Text style={styles.secondaryButtonText}>
+                Newest
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() =>
+                setInventorySort("name")
+              }
+            >
+              <Text style={styles.secondaryButtonText}>
+                A-Z
+              </Text>
+            </TouchableOpacity>
+          </View>
+ 
 
           <ScrollView
             contentContainerStyle={
