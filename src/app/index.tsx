@@ -61,6 +61,8 @@ export default function HomeScreen() {
   useEffect(() => {
     loadProducts();
   }, []);
+  const [editingProductId, setEditingProductId] =
+    useState<string | null>(null);
 
   const loadProducts = async () => {
     try {
@@ -233,10 +235,25 @@ export default function HomeScreen() {
     setExpirationDate("");
     setQuantity("1");
     setCategory("");
+    setEditingProductId(null);
   };
 
   const closeAddModal = () => {
     setAddModalVisible(false);
+  };
+const editProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setProductName(product.name);
+    setExpirationDate(product.expirationDate);
+    setQuantity(product.quantity.toString());
+    setCategory(product.category);
+
+    setScannedBarcode(product.barcode ?? null);
+    setScannedBarcodeType(
+      product.barcodeType ?? null
+    );
+     setInventoryVisible(false);
+     setAddModalVisible(true);
   };
 
   const saveProduct = async () => {
@@ -311,14 +328,30 @@ export default function HomeScreen() {
 
     let updatedProducts: Product[];
 
-    if (matchingBatchIndex >= 0) {
+    if (editingProductId) {
+      updatedProducts = products.map(
+        (product) =>
+          product.id === editingProductId
+            ? {
+                ...product,
+                name: cleanName,
+                expirationDate: cleanDate,
+                quantity: parsedQuantity,
+                category:
+                  cleanCategory ||
+                  "Uncategorized",
+              }
+            : product
+      );
+    } else if (matchingBatchIndex >= 0) {
       updatedProducts = products.map(
         (product, index) =>
           index === matchingBatchIndex
             ? {
                 ...product,
                 quantity:
-                  product.quantity + parsedQuantity,
+                  product.quantity +
+                  parsedQuantity,
               }
             : product
       );
@@ -672,8 +705,8 @@ export default function HomeScreen() {
         product.barcode === normalizedData
     );
     const legacyProducts = products.filter(
-  (product) => !product.barcode
-);
+      (product) => !product.barcode
+    );
     setBarcodeScanned(true);
     setScannedBarcode(normalizedData);
     setScannedBarcodeType(type);
@@ -1152,7 +1185,9 @@ export default function HomeScreen() {
                     styles.saveButtonText
                   }
                 >
-                  Save Product
+                 {editingProductId
+                    ? "Update Product"
+                    : "Save Product"} 
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1345,11 +1380,15 @@ export default function HomeScreen() {
               </View>
             ) : (
               products.map((product) => (
-                <View
+                <TouchableOpacity
                   key={product.id}
                   style={
                     styles.inventoryCard
                   }
+                  onPress={() =>
+                    editProduct(product)
+                  }
+                  activeOpacity={0.8}
                 >
                   <View
                     style={
@@ -1448,7 +1487,7 @@ export default function HomeScreen() {
                       {product.barcode}
                     </Text>
                   )}
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </ScrollView>
