@@ -40,7 +40,8 @@ export default function HomeScreen() {
  
   const [inventoryFilter, setInventoryFilter] =
     useState<"all" | "fresh" | "soon" | "expired">("all");
- 
+ const [inventorySearch, setInventorySearch] =
+    useState("");
     
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -227,20 +228,38 @@ export default function HomeScreen() {
       expired,
     };
   }, [products]);
-
   const filteredProducts = useMemo(() => {
-    if (inventoryFilter === "all") {
-      return products;
-    }
+    const searchTerm =
+      inventorySearch.trim().toLowerCase();
 
-    return products.filter(
-      (product) =>
+    return products.filter((product) => {
+      const matchesStatus =
+        inventoryFilter === "all" ||
         getProductStatus(
           product.expirationDate
-        ) === inventoryFilter
-    );
-  }, [products, inventoryFilter]);
+        ) === inventoryFilter;
 
+      const matchesSearch =
+        searchTerm === "" ||
+        product.name
+          .toLowerCase()
+          .includes(searchTerm) ||
+        product.category
+          .toLowerCase()
+          .includes(searchTerm) ||
+        product.barcode
+          ?.toLowerCase()
+          .includes(searchTerm);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [
+    products,
+    inventoryFilter,
+    inventorySearch,
+  ]);  
+
+    
   const newestProduct = useMemo(() => {
     if (products.length === 0) {
       return null;
@@ -1351,6 +1370,20 @@ const editProduct = (product: Product) => {
               shown
             </Text>
           </View>
+ <TextInput
+            style={styles.input}
+            placeholder="Search name, category, or code..."
+            placeholderTextColor="#6F7A84"
+            value={inventorySearch}
+	    onPress={() => {
+ 		 setInventoryFilter("all");
+		 setInventorySearch("");
+  		 setInventoryVisible(true);
+	    }}
+            onChangeText={setInventorySearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
           <ScrollView
             contentContainerStyle={
