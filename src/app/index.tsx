@@ -37,6 +37,11 @@ const STORAGE_KEY = "@expireeze_products";
 export default function HomeScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [inventoryVisible, setInventoryVisible] = useState(false);
+ 
+  const [inventoryFilter, setInventoryFilter] =
+    useState<"all" | "fresh" | "soon" | "expired">("all");
+ 
+    
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
@@ -215,12 +220,26 @@ export default function HomeScreen() {
       }
     });
 
+
     return {
       fresh,
       soon,
       expired,
     };
   }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    if (inventoryFilter === "all") {
+      return products;
+    }
+
+    return products.filter(
+      (product) =>
+        getProductStatus(
+          product.expirationDate
+        ) === inventoryFilter
+    );
+  }, [products, inventoryFilter]);
 
   const newestProduct = useMemo(() => {
     if (products.length === 0) {
@@ -853,96 +872,74 @@ const editProduct = (product: Product) => {
           Today's Status
         </Text>
 
-        <View style={styles.statusCard}>
-          <View
-            style={
-              styles.statusTextContainer
-            }
-          >
-            <Text
-              style={styles.statusTitle}
-            >
+   <TouchableOpacity
+          style={styles.statusCard}
+          activeOpacity={0.8}
+          onPress={() => {
+            setInventoryFilter("fresh");
+            setInventoryVisible(true);
+          }}
+        >
+          <View style={styles.statusTextContainer}>
+            <Text style={styles.statusTitle}>
               🟢 Fresh
             </Text>
 
-            <Text
-              style={
-                styles.statusDescription
-              }
-            >
+            <Text style={styles.statusDescription}>
               Products in good standing
             </Text>
           </View>
 
-          <Text
-            style={styles.freshNumber}
-          >
-            {isLoaded
-              ? counts.fresh
-              : "-"}
+          <Text style={styles.freshNumber}>
+            {isLoaded ? counts.fresh : "-"}
           </Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.statusCard}>
-          <View
-            style={
-              styles.statusTextContainer
-            }
-          >
-            <Text
-              style={styles.statusTitle}
-            >
+        <TouchableOpacity
+          style={styles.statusCard}
+          activeOpacity={0.8}
+          onPress={() => {
+            setInventoryFilter("soon");
+            setInventoryVisible(true);
+          }}
+        >
+          <View style={styles.statusTextContainer}>
+            <Text style={styles.statusTitle}>
               🟡 Expiring Soon
             </Text>
 
-            <Text
-              style={
-                styles.statusDescription
-              }
-            >
+            <Text style={styles.statusDescription}>
               Products expiring within 7 days
             </Text>
           </View>
 
-          <Text
-            style={styles.warningNumber}
-          >
-            {isLoaded
-              ? counts.soon
-              : "-"}
+          <Text style={styles.warningNumber}>
+            {isLoaded ? counts.soon : "-"}
           </Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.statusCard}>
-          <View
-            style={
-              styles.statusTextContainer
-            }
-          >
-            <Text
-              style={styles.statusTitle}
-            >
+        <TouchableOpacity
+          style={styles.statusCard}
+          activeOpacity={0.8}
+          onPress={() => {
+            setInventoryFilter("expired");
+            setInventoryVisible(true);
+          }}
+        >
+          <View style={styles.statusTextContainer}>
+            <Text style={styles.statusTitle}>
               🔴 Expired
             </Text>
 
-            <Text
-              style={
-                styles.statusDescription
-              }
-            >
+            <Text style={styles.statusDescription}>
               Products to remove
             </Text>
           </View>
 
-          <Text
-            style={styles.expiredNumber}
-          >
-            {isLoaded
-              ? counts.expired
-              : "-"}
+          <Text style={styles.expiredNumber}>
+            {isLoaded ? counts.expired : "-"}
           </Text>
-        </View>
-
+        </TouchableOpacity>
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.primaryButton}
@@ -1332,7 +1329,13 @@ const editProduct = (product: Product) => {
             <Text
               style={styles.modalTitle}
             >
-              Inventory
+               {inventoryFilter === "all"
+                ? "Inventory"
+                : inventoryFilter === "fresh"
+                  ? "Fresh"
+                  : inventoryFilter === "soon"
+                    ? "Expiring Soon"
+                    : "Expired"}
             </Text>
 
             <Text
@@ -1340,11 +1343,11 @@ const editProduct = (product: Product) => {
                 styles.modalSubtitle
               }
             >
-              {products.length}{" "}
-              {products.length === 1
-                ? "product"
-                : "products"}{" "}
-              tracked
+               {filteredProducts.length}{" "}
+              {filteredProducts.length === 1
+                ? "batch"
+                : "batches"}{" "}
+              shown
             </Text>
           </View>
 
@@ -1356,7 +1359,7 @@ const editProduct = (product: Product) => {
               false
             }
           >
-            {products.length === 0 ? (
+            {filteredProducts.length === 0 ? (
               <View
                 style={
                   styles.emptyInventory
@@ -1379,7 +1382,7 @@ const editProduct = (product: Product) => {
                 </Text>
               </View>
             ) : (
-              products.map((product) => (
+              filteredProducts.map((product) => (
                 <TouchableOpacity
                   key={product.id}
                   style={
